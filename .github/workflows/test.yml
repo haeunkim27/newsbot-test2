@@ -9,15 +9,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 코드 가져오기
+        uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Python 설치
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
-        run: pip install requests openai
+      - name: 라이브러리 설치
+        run: pip install requests openai beautifulsoup4
 
-      - name: Run script
+      - name: 파이썬 실행
         run: python 0416navertime.py
