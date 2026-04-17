@@ -57,7 +57,7 @@ def pre_filter(news):
         result.append((title, link, category, pub_date))
     return result
 
-# 🔹 네이버 뉴스 API (🔥 pubDate 사용)
+# 🔹 네이버 뉴스 API
 def get_naver_news(keyword):
     url = "https://openapi.naver.com/v1/search/news.json"
     headers = {
@@ -123,17 +123,24 @@ print("총 기사:", len(all_news))
 all_news = pre_filter(all_news)
 print("필터 후:", len(all_news))
 
-# 🔥 오늘 기사 필터 (크롤링 제거)
+# 🔥 시간 필터 + fallback
 filtered_news = []
 now = datetime.utcnow() + timedelta(hours=9)
-cutoff = now - timedelta(hours=24)
+cutoff = now - timedelta(hours=36)
 
 for title, link, category, pub_date in all_news:
     if pub_date and pub_date >= cutoff:
         filtered_news.append((title, link, category))
 
+if not filtered_news:
+    print("⚠️ 오늘 기사 없음 → 전체 기사 사용")
+    filtered_news = [(t, l, c) for t, l, c, _ in all_news]
+
 all_news = filtered_news
 print("오늘 기사:", len(all_news))
+
+# 🔥 GPT 과부하 방지 (핵심)
+all_news = all_news[:300]
 
 if not all_news:
     print("기사 없음")
@@ -153,7 +160,7 @@ def call_gpt(prompt):
 
 today = (datetime.utcnow() + timedelta(hours=9)).strftime("%y%m%d")
 
-# 🔥 바로 GPT (1회 호출)
+# 🔥 GPT 입력
 final_input = "\n".join([
     f"{category} | {title} | {link}"
     for title, link, category in all_news
@@ -164,19 +171,14 @@ final_prompt = f"""
 
 핵심:
 - 동일 이슈의 완전 중복 기사만 제거
-- 같은 이슈라도 관점이 다르면 유지
+- 헤드라인 유사성도 파악해서 제거
+- 같은 이슈라도 관점이 다르면 유지 
 - 기사 요약 금지
 - 설명 문장 금지
-- 반드시 "기사 제목 + URL" 형태로만 출력
 
 중요:
-- 지나치게 많이 제거하지 말 것
-- 각 카테고리는 가능한 최대 개수에 가깝게 채울 것
-
-기사 수 규칙:
-- 자사 및 경쟁사 동향: 최대 8건
-- 모빌리티 동향: 최대 8건
-- IT 업계 동향: 최대 8건
+- 각 카테고리에 최소 5개 이상 기사 포함
+- 출력이 비어있으면 실패로 간주
 
 출력 형식 (절대 변경 금지):
 
@@ -203,9 +205,23 @@ URL
 
 final_result = call_gpt(final_prompt)
 
+# 🔥 GPT 실패 fallback
+if not final_result or len(final_result.strip()) < 20:
+    print("⚠️ GPT 결과 비어있음 → fallback 실행")
+
+    final_result = f"[미디어브리핑-{today}]\n\n"
+
+    for category in KEYWORDS.keys():
+        final_result += f"■ {category}\n\n"
+        sample = [x for x in all_news if x[2] == category][:5]
+
+        for title, link, _ in sample:
+            final_result += f"{title}\n{link}\n\n"
+
 print("\n===== 결과 =====\n")
 print(final_result)
 
+# 🔹 슬랙 전송
 requests.post(
     SLACK_WEBHOOK_URL,
     json={"text": final_result},
