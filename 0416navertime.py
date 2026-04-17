@@ -145,6 +145,9 @@ cutoff = now - timedelta(hours=24)
 for title, link, category in all_news:
     dt = get_article_datetime(link)
 
+    if dt:
+        dt = dt.replace(tzinfo=None)   # ← 이 줄 추가
+    
     if dt and dt >= cutoff:
         filtered_news.append((title, link, category))
 
