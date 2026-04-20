@@ -46,7 +46,20 @@ seen_links = set()
 seen_titles = set()
 
 def normalize_title(title):
-    return html.unescape(title).replace(" ", "").lower()
+    title = clean_html(html.unescape(title))
+    title = title.lower()
+
+    # 괄호/특수문자 제거
+    title = re.sub(r'\(.*?\)|\[.*?\]', '', title)
+    title = re.sub(r'[^가-힣a-z0-9 ]', '', title)
+
+    # 의미 없는 단어 제거
+    title = re.sub(r'(단독|속보|종합)', '', title)
+
+    # 공백 제거
+    title = title.replace(" ", "")
+
+    return title
 
 # 🔹 필터
 def pre_filter(news):
@@ -109,8 +122,20 @@ for category, keywords in KEYWORDS.items():
             try:
                 norm = normalize_title(title)
 
-                if norm in seen_titles:
+                # 🔥 유사도 기반 중복 제거
+                skip = False
+                for existing in seen_titles:
+                    from difflib import SequenceMatcher
+                    similarity = SequenceMatcher(None, norm, existing).ratio()
+                    
+                    if similarity > 0.8:
+                        skip = True
+                        break
+
+                if skip:
                     continue
+
+                # 기존 링크 중복 제거는 유지
                 if link in seen_links:
                     continue
 
