@@ -3,7 +3,11 @@ import requests
 from datetime import datetime, timedelta
 from openai import OpenAI
 import html
+import re  # ← 추가
 
+def clean_html(raw):  # ← 추가
+    return re.sub(r'<.*?>', '', raw)
+    
 print("시작됨")
 
 # ✅ API 키
@@ -78,7 +82,7 @@ def get_naver_news(keyword):
 
     results = []
     for item in data.get("items", []):
-        title = html.unescape(item["title"])
+        title = clean_html(html.unescape(item["title"]))
         link = item["link"]
 
         if "n.news.naver.com" in link:
