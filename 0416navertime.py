@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from openai import OpenAI
 import html
 import re  # ← 추가
+from difflib import SequenceMatcher
 
 def clean_html(raw):  # ← 추가
     return re.sub(r'<.*?>', '', raw)
@@ -122,13 +123,18 @@ for category, keywords in KEYWORDS.items():
             try:
                 norm = normalize_title(title)
 
-                # 🔥 유사도 기반 중복 제거
+                # 🔥 유사도 + 키워드 기반 중복 제거 (강화 버전)
                 skip = False
+
+                def extract_core(text):
+                    words = re.findall(r'[가-힣a-z0-9]+', text)
+                    return set(words[:5])
+
                 for existing in seen_titles:
-                    from difflib import SequenceMatcher
                     similarity = SequenceMatcher(None, norm, existing).ratio()
-                    
-                    if similarity > 0.8:
+
+                    # 핵심 단어 겹침 + 유사도 둘 다 사용
+                    if similarity > 0.9 or len(extract_core(norm) & extract_core(existing)) >= 3:
                         skip = True
                         break
 
