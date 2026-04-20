@@ -44,7 +44,7 @@ KEYWORDS = {
 
 all_news = []
 seen_links = set()
-seen_titles = set()
+seen_prefix = set()
 
 def normalize_title(title):
     title = clean_html(html.unescape(title))
@@ -123,29 +123,23 @@ for category, keywords in KEYWORDS.items():
             try:
                 norm = normalize_title(title)
 
-                # 🔥 유사도 + 키워드 기반 중복 제거 (강화 버전)
-                skip = False
+                # 🔥 prefix 기반 중복 제거 (핵심)
+                def get_prefix(title):
+                    title = clean_html(html.unescape(title))
+                    title = re.sub(r'[^가-힣a-zA-Z0-9 ]', '', title)
+                    words = title.split()
+                    return " ".join(words[:4])
 
-                def extract_core(text):
-                    words = re.findall(r'[가-힣a-z0-9]+', text)
-                    return set(words[:5])
+                prefix = get_prefix(title)
 
-                for existing in seen_titles:
-                    similarity = SequenceMatcher(None, norm, existing).ratio()
-
-                    # 핵심 단어 겹침 + 유사도 둘 다 사용
-                    if similarity > 0.9 or len(extract_core(norm) & extract_core(existing)) >= 3:
-                        skip = True
-                        break
-
-                if skip:
+                if prefix in seen_prefix:
                     continue
 
                 # 기존 링크 중복 제거는 유지
                 if link in seen_links:
                     continue
 
-                seen_titles.add(norm)
+                seen_prefix.add(prefix)
                 seen_links.add(link)
                 all_news.append((title, link, category, pub_date))
 
